@@ -1,0 +1,393 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    df_print: kable
+  tables: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(splitstackshape)
+library(knitr)
+library(kableExtra)
+message=FALSE
+warning=FALSE
+include=FALSE
+options(tinytex.verbose = TRUE)
+```
+
+## Loading and Cleaning the Data
+The data we are using is a combination of song lyrics from AZLyrics and song information and artist information from Spotify. The three tables were sourced form kaggle.com and combined to give us information about the songs we are analyzing. 
+
+
+### Load the AZLyrics datasets by artist in alphabetical order
+The lyrics tables are organized by artist so we loaded them and combined them into one large table. Before processing and cleaning the data this were the columns and dimensions. 
+
+```{r include=FALSE}
+lyrics_19 <- read.csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_19.csv")
+lyrics_a <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_a.csv")
+lyrics_b <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_b.csv")
+lyrics_c <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_c.csv")
+lyrics_d <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_d.csv")
+lyrics_e <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_e.csv")
+lyrics_f <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_f.csv")
+lyrics_g <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_g.csv")
+lyrics_h <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_h.csv")
+lyrics_i <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_i.csv")
+lyrics_j <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_j.csv")
+lyrics_k <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_k.csv")
+lyrics_l <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_l.csv")
+lyrics_m <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_m.csv")
+lyrics_n <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_n.csv")
+lyrics_o <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_o.csv")
+lyrics_p <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_p.csv")
+lyrics_q <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_q.csv")
+lyrics_r <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_r.csv")
+lyrics_s <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_s.csv")
+lyrics_t <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_t.csv")
+lyrics_u <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_u.csv")
+lyrics_v <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_v.csv")
+lyrics_w <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_w.csv")
+lyrics_x <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_x.csv")
+lyrics_y <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_y.csv")
+lyrics_z <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/AZlyrics data/azlyrics-scraper/azlyrics_lyrics_z.csv")
+
+```
+
+```{r}
+lyriclist <- list(lyrics_19, lyrics_a, lyrics_b, lyrics_c, lyrics_d, lyrics_e, lyrics_f, lyrics_g, lyrics_h, lyrics_i, lyrics_j, lyrics_k, lyrics_l, lyrics_m, lyrics_n, lyrics_o, lyrics_p, lyrics_q, lyrics_r, lyrics_s, lyrics_t, lyrics_u, lyrics_v, lyrics_w, lyrics_x, lyrics_y, lyrics_z)
+
+azlyrics <- rbindlist(lyriclist, use.names=TRUE)
+
+head(azlyrics)
+```
+
+
+### Clean the lyrics data
+
+Select the artist, song name, and lyrics from the table and remove all punctuation from the lyrics as well as renaming the columns in the table.
+
+In order to make the data compatible with the spotify dataset there are a few changes we have to make:
+* Select only the artist name, song name, and lyrics. The URLs are not important for our analysis.
+* Remove all punctuation from the lyrics in order to make word counting and matching easier.
+* Remove all punctuation from the artist names in order to match the spotify syntax.
+* Change all names written in the form 'carpenters, the' to match the spotify syntax which has all artists written straight forward, 'the carpenters'.
+
+After renaming the columns this is what the lyrics table looks like now:
+```{r}
+azlyrics <- azlyrics %>% select(ARTIST_NAME, SONG_NAME, LYRICS)
+colnames(azlyrics) <- c("artist", "song", "lyrics")
+azlyrics$lyrics <- str_replace_all(azlyrics[, lyrics], "[[:punct:]]", "")
+azlyrics$artist <- str_replace_all(azlyrics[, artist], "\\'", "")
+azlyrics$artist <- gsub("(.+),\\s(.+)", "\\2 \\1", azlyrics$artist)
+
+head(azlyrics)
+
+
+```
+
+
+### Load Spotify datasets
+
+The Spotify data comes packaged in several different tables. For our project we will use the tables 'data.csv' and 'data_w_genres.csv' That look like this respectively:
+```{r include=FALSE}
+spotify_song_data <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/Spotify data/data.csv")
+spotify_genre_data <- read_csv("/Users/akjen/Documents/NTNU/ml/Project/Spotify data/data_w_genres.csv")
+
+```
+
+```{r}
+
+head(spotify_song_data)
+head(spotify_genre_data)
+
+```
+
+### Clean the spotify data
+We made a few changes to the spotify tables before we merged all our data. 
+Changes made to the table with song information:
+* Select the artist and the song titles.
+* Remove brackets and quotes from the lists of artists.
+* Split the songs into separate items with one artist per entity to make sure we match the song to the correct item in the lyrics table.
+
+
+Changes made to the table with genre information:
+* Select artists and genres.
+* Remove all artist with no listed genres.
+
+```{r}
+spotify_song_data <- spotify_song_data %>% select(artists, name)
+```
+
+```{r}
+colnames(spotify_song_data) <- c("artist", "song")
+spotify_song_data$artist <- str_replace_all(spotify_song_data$artist, c("\\[" = "", "\\]" = "", "\\'" = "", "\"" = "", "\\$" = ""))
+
+spotify_song_data <- cSplit(spotify_song_data, "artist", sep=",", direction="long")
+```
+
+
+```{r}
+spotify_genre_data <- spotify_genre_data %>% select(artists, genres)
+colnames(spotify_genre_data) <- c("artist", "genre")
+spotify_genre_data <- spotify_genre_data[!grepl("\\[\\]",spotify_genre_data$genre),]
+```
+
+After renaming the columns the Spotify data looks like this:
+```{r}
+
+head(spotify_song_data)
+head(spotify_genre_data)
+```
+
+Merge the Spotify datasets by artist and change all letters to lowercase
+```{r}
+spotify <- merge(x=spotify_song_data, y=spotify_genre_data, by=c("artist"))
+spotify$artist <- str_remove_all(spotify$artist, c("é"="e"))
+spotify$artist <- tolower(spotify$artist)
+spotify$song <- tolower(spotify$song)
+spotify$genre <- tolower(spotify$genre)
+head(spotify)
+```
+
+
+### Clean the Genre Data
+Now that the Spotify table has been merged we can process the genres so that our model has a few genres to choose from for its labels.
+Based on a frequency analysis of the genres we mapped the lists of genres to one genre.
+These include:
+* Rock
+* Pop
+* Country
+* Hip Hop
+* R&B
+* Punk
+* Caribbean
+* Jazz
+* Electronic
+* Christian
+* Latin
+* Easy Listening
+* Metal
+* Folk
+
+```{r}
+spotify$genre <- gsub(".*house.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*escape room.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*rave.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*edm.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*electronic.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*nu-cumbia.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*nightcore.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*gymcore.*", "metal", spotify$genre)
+spotify$genre <- gsub(".*slayer.*", "metal", spotify$genre)
+spotify$genre <- gsub(".*nu metal.*", "hip hop", spotify$genre)
+spotify$genre <- gsub(".*eurovision.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*a cappella.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*background.*", "easy listening", spotify$genre)
+spotify$genre <- gsub(".*easy listening.*", "easy listening", spotify$genre)
+spotify$genre <- gsub(".*mexican.*", "latin", spotify$genre)
+spotify$genre <- gsub(".*bluegrass.*", "country", spotify$genre)
+spotify$genre <- gsub(".*broadway.*", "broadway", spotify$genre)
+spotify$genre <- gsub(".*show tune.*", "broadway", spotify$genre)
+spotify$genre <- gsub(".*hollywood.*", "broadway", spotify$genre)
+spotify$genre <- gsub(".*emo.*", "punk", spotify$genre)
+spotify$genre <- gsub(".*reggae.*", "caribbean", spotify$genre)
+spotify$genre <- gsub(".*soca.*", "caribbean", spotify$genre)
+spotify$genre <- gsub(".*ska.*", "caribbean", spotify$genre)
+spotify$genre <- gsub(".*dancehall.*", "caribbean", spotify$genre)
+spotify$genre <- gsub(".*redneck.*", "country", spotify$genre)
+spotify$genre <- gsub(".*swing.*", "jazz", spotify$genre)
+spotify$genre <- gsub(".*gospel.*", "christian", spotify$genre)
+spotify$genre <- gsub(".*freestyle.*", "r&b", spotify$genre)
+spotify$genre <- gsub(".*boy band.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*urban contemporary.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*christchurch.*", "christian", spotify$genre)
+spotify$genre <- gsub(".*disney.*", "broadway", spotify$genre)
+spotify$genre <- gsub(".*west end.*", "broadway", spotify$genre)
+spotify$genre <- gsub(".*hyphy.*", "electronic", spotify$genre)
+spotify$genre <- gsub(".*midwest americana.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*otacore.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*quiet storm.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*celtic.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*standards.*", "easy listening", spotify$genre)
+spotify$genre <- gsub(".*epicore.*", "easy listening", spotify$genre)
+spotify$genre <- gsub(".*hard alternative.*", "rock", spotify$genre)
+spotify$genre <- gsub(".*classical.*", "easy listening", spotify$genre)
+spotify$genre <- gsub(".*alternative americana*", "folk", spotify$genre)
+spotify$genre <- gsub(".*psych.*", "punk", spotify$genre)
+spotify$genre <- gsub(".*stomp and holler.*", "rock", spotify$genre)
+spotify$genre <- gsub(".*disco.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*new americana.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*opm.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*chanson.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*neo-singer-songwriter.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*neo mellow.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*wrestling.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*mellow gold.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*idol.*", "pop", spotify$genre)
+
+spotify$genre <- gsub(".*latin.*", "latin", spotify$genre)
+spotify$genre <- gsub(".*blues.*", "jazz", spotify$genre)
+spotify$genre <- gsub(".*jazz.*", "jazz", spotify$genre)
+spotify$genre <- gsub(".*comedy.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*christian.*", "christian", spotify$genre)
+spotify$genre <- gsub(".*worship.*", "christian", spotify$genre)
+spotify$genre <- gsub(".*r&b.*", "r&b", spotify$genre)
+spotify$genre <- gsub(".*punk.*", "punk", spotify$genre)
+spotify$genre <- gsub(".*indie.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*soul.*", "r&b", spotify$genre)
+spotify$genre <- gsub(".*hop.*", "hip hop", spotify$genre)
+spotify$genre <- gsub(".*metal.*", "metal", spotify$genre)
+spotify$genre <- gsub(".*hip hop.*", "hip hop", spotify$genre)
+spotify$genre <- gsub(".*rap.*", "hip hop", spotify$genre)
+spotify$genre <- gsub(".*folk.*", "folk", spotify$genre)
+spotify$genre <- gsub(".*country.*", "country", spotify$genre)
+spotify$genre <- gsub(".*pop.*", "pop", spotify$genre)
+spotify$genre <- gsub(".*rock.*", "rock", spotify$genre)
+
+```
+
+```{r}
+
+final <- merge(x=spotify, y=azlyrics, by=c("artist", "song")) %>% unique()
+final <- final %>% filter(genre != 'broadway')
+
+```
+
+```{r}
+
+write.csv(final,"/Users/akjen/Documents/NTNU/ml/Project/final_data.csv", row.names = TRUE)
+head(final)
+
+```
+
+
+* Rock
+* Pop
+* Country
+* Hip Hop
+* R&B
+* Punk
+* Caribbean
+* Jazz
+* Electronic
+* Christian
+* Latin
+* Easy Listening
+* Metal
+
+```{r}
+final %>% count(genre)
+
+final %>% count(genre)
+
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(final))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(final)), size = smp_size)
+
+train <- final[train_ind, ]
+test <- final[-train_ind, ]
+
+rock <- train %>% filter(genre == 'rock') %>% select(lyrics)
+write.csv(rock, "train_lyrics/rock.txt", row.names=FALSE)
+
+pop <- train %>% filter(genre == 'pop') %>% select(lyrics)
+write.csv(pop, "train_lyrics/pop.txt", row.names=FALSE)
+
+country <- train %>% filter(genre == 'country') %>% select(lyrics)
+write.csv(country, "train_lyrics/country.txt", row.names=FALSE)
+
+hiphop <- train %>% filter(genre == 'hiphop') %>% select(lyrics)
+write.csv(hiphop, "train_lyrics/hiphop.txt", row.names=FALSE)
+
+rnb <- train %>% filter(genre == 'rnb') %>% select(lyrics)
+write.csv(rnb, "train_lyrics/rnb.txt", row.names=FALSE)
+
+punk <- train %>% filter(genre == 'punk') %>% select(lyrics)
+write.csv(punk, "train_lyrics/punk.txt", row.names=FALSE)
+
+caribbean <- train %>% filter(genre == 'caribbean') %>% select(lyrics)
+write.csv(caribbean, "train_lyrics/caribbean.txt", row.names=FALSE)
+
+jazz <- train %>% filter(genre == 'jazz') %>% select(lyrics)
+write.csv(jazz, "train_lyrics/jazz.txt", row.names=FALSE)
+
+electronic <- train %>% filter(genre == 'electronic') %>% select(lyrics)
+write.csv(electronic, "train_lyrics/electronic.txt", row.names=FALSE)
+
+christian <- train %>% filter(genre == 'christian') %>% select(lyrics)
+write.csv(christian, "train_lyrics/christian.txt", row.names=FALSE)
+
+latin <- train %>% filter(genre == 'latin') %>% select(lyrics)
+write.csv(latin, "train_lyrics/latin.txt", row.names=FALSE)
+
+easylistening <- train %>% filter(genre == 'easylistening') %>% select(lyrics)
+write.csv(easylistening, "train_lyrics/easylistening.txt", row.names=FALSE)
+
+metal <- train %>% filter(genre == 'metal') %>% select(lyrics)
+write.csv(metal, "train_lyrics/metal.txt", row.names=FALSE)
+
+folk <- train %>% filter(genre == 'folk') %>% select(lyrics)
+write.csv(folk, "train_lyrics/folk.txt", row.names=FALSE)
+
+
+
+rock <- test %>% filter(genre == 'rock') %>% select(lyrics)
+write.csv(rock, "test_lyrics/rock.txt", row.names=FALSE)
+
+pop <- test %>% filter(genre == 'pop') %>% select(lyrics)
+write.csv(pop, "test_lyrics/pop.txt", row.names=FALSE)
+
+country <- test %>% filter(genre == 'country') %>% select(lyrics)
+write.csv(country, "test_lyrics/country.txt", row.names=FALSE)
+
+hiphop <- test %>% filter(genre == 'hiphop') %>% select(lyrics)
+write.csv(hiphop, "test_lyrics/hiphop.txt", row.names=FALSE)
+
+rnb <- test %>% filter(genre == 'rnb') %>% select(lyrics)
+write.csv(rnb, "test_lyrics/rnb.txt", row.names=FALSE)
+
+punk <- test %>% filter(genre == 'punk') %>% select(lyrics)
+write.csv(punk, "test_lyrics/punk.txt", row.names=FALSE)
+
+caribbean <- test %>% filter(genre == 'caribbean') %>% select(lyrics)
+write.csv(caribbean, "test_lyrics/caribbean.txt", row.names=FALSE)
+
+jazz <- test %>% filter(genre == 'jazz') %>% select(lyrics)
+write.csv(jazz, "test_lyrics/jazz.txt", row.names=FALSE)
+
+electronic <- test %>% filter(genre == 'electronic') %>% select(lyrics)
+write.csv(electronic, "test_lyrics/electronic.txt", row.names=FALSE)
+
+christian <- test %>% filter(genre == 'christian') %>% select(lyrics)
+write.csv(christian, "test_lyrics/christian.txt", row.names=FALSE)
+
+latin <- test %>% filter(genre == 'latin') %>% select(lyrics)
+write.csv(latin, "test_lyrics/latin.txt", row.names=FALSE)
+
+easylistening <- test %>% filter(genre == 'easylistening') %>% select(lyrics)
+write.csv(easylistening, "test_lyrics/easylistening.txt", row.names=FALSE)
+
+metal <- test %>% filter(genre == 'metal') %>% select(lyrics)
+write.csv(metal, "test_lyrics/metal.txt", row.names=FALSE)
+
+folk <- test %>% filter(genre == 'folk') %>% select(lyrics)
+write.csv(folk, "test_lyrics/folk.txt", row.names=FALSE)
+
+
+
+```
+
+
+
+
