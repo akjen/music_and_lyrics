@@ -5,6 +5,7 @@ Project files for Unsupervised_learning_Group 14s final project.
 
 The repository includes the files for:  
 Data cleaning (genrePrediction.Rmd)  
+Markdown file with the data cleaning process (genrePrediction.html)  
 kNN learning (kNN.ipynb)  
 Neural network learning (neuralnetworkgenre.ipynb)  
 Alternate neural network learning, see section 5.2 (alternate_neuralnetwork.ipynb)  
